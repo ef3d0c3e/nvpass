@@ -161,6 +161,8 @@ fn main() -> std::io::Result<()> {
 		dest_out.write_all(&data)?;
 
 		return Ok(());
+	} else {
+		print_usage(&args[0], opts);
 	}
 	Ok(())
 }
@@ -170,7 +172,6 @@ mod tests {
 	use crate::db::v1;
 
 	use super::*;
-	use std::io::{BufReader, BufWriter};
 
 	fn make_db(passphrase: &str) -> v1::Db {
 		v1::Db::new(Zeroizing::new(passphrase.to_string()))
