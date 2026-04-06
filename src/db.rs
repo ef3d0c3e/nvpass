@@ -24,13 +24,7 @@ pub mod v1 {
 		Argon2,
 		password_hash::{Salt, SaltString, rand_core::RngCore},
 	};
-	use chacha20poly1305::{
-		KeyInit,
-		aead::{
-			OsRng,
-			generic_array::{GenericArray, typenum::Zero},
-		},
-	};
+	use chacha20poly1305::{KeyInit, aead::OsRng};
 	use serde::{Deserialize, Serialize};
 	use zeroize::Zeroizing;
 
@@ -81,7 +75,7 @@ pub mod v1 {
 		}
 
 		/// Get the AAD header for the database
-		pub fn aad(&self, nonce: [u8; 24]) -> Header {
+		fn aad(&self, nonce: [u8; 24]) -> Header {
 			Header {
 				version: self.version(),
 				nonce,

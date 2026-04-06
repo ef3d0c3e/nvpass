@@ -1,16 +1,11 @@
 use std::{
 	env,
-	fs::canonicalize,
-	io::{self, BufRead, BufReader, BufWriter, ErrorKind, Read, Write},
-	os::unix::fs::MetadataExt,
+	io::{self, BufRead, Read, Write},
 };
 
 pub mod db;
 
-use argon2::Version;
-use chacha20poly1305::aead::generic_array::typenum::Zero;
 use getopts::Options;
-use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
 use crate::db::Database;
@@ -19,18 +14,7 @@ use crate::db::Database;
 enum PassphraseSource {
 	Prompt,
 	Fd(i32),
-	Stdin,
-}
-
-/// Where to get the input form
-enum InputSource {
-	File(std::fs::File),
-	Stdin,
-}
-
-/// Where to write the output ot
-enum OutputDest {
-	File(std::fs::File),
+	#[allow(unused)]
 	Stdin,
 }
 
@@ -156,7 +140,7 @@ fn main() -> std::io::Result<()> {
 		};
 
 		// Read input
-		let mut src_in: Box<dyn Read> = if input == "-" {
+		let src_in: Box<dyn Read> = if input == "-" {
 			Box::new(io::stdin().lock())
 		} else {
 			Box::new(std::fs::File::open(&input)?)
@@ -243,21 +227,6 @@ mod tests {
 	}
 
 	#[test]
-	fn test_tampered_ciphertext_fails() {
-		let mut buf = Vec::new();
-		make_db("passphrase")
-			.write(Box::new(&mut buf), b"secret data")
-			.unwrap();
-
-		// Flip a byte in the ciphertext region (after version + salt + nonce)
-		let header_len = 8 /* version */ + 32 /* salt */ + 24 /* nonce */;
-		buf[header_len] ^= 0xFF;
-
-		let result = make_db("passphrase").read(Box::new(buf.as_slice()));
-		assert!(result.is_err());
-	}
-
-	#[test]
 	fn test_tampered_version_fails() {
 		let mut buf = Vec::new();
 		make_db("passphrase")
@@ -272,20 +241,6 @@ mod tests {
 	}
 
 	#[test]
-	fn test_tampered_nonce_fails() {
-		let mut buf = Vec::new();
-		make_db("passphrase")
-			.write(Box::new(&mut buf), b"secret data")
-			.unwrap();
-
-		// Flip a byte in the nonce
-		buf[8 + 32 + 1] ^= 0xFF;
-
-		let result = make_db("passphrase").read(Box::new(buf.as_slice()));
-		assert!(result.is_err());
-	}
-
-	#[test]
 	fn test_tampered_salt_fails() {
 		let mut buf = Vec::new();
 		make_db("passphrase")
@@ -293,7 +248,35 @@ mod tests {
 			.unwrap();
 
 		// Flip a byte in the salt
-		buf[8 + 1] ^= 0xFF;
+		buf[8] ^= 0xFF;
+
+		let result = make_db("passphrase").read(Box::new(buf.as_slice()));
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn test_tampered_nonce_fails() {
+		let mut buf = Vec::new();
+		make_db("passphrase")
+			.write(Box::new(&mut buf), b"secret data")
+			.unwrap();
+
+		// Flip a byte in the nonce
+		buf[8 + 32] ^= 0xFF;
+
+		let result = make_db("passphrase").read(Box::new(buf.as_slice()));
+		assert!(result.is_err());
+	}
+
+	#[test]
+	fn test_tampered_ciphertext_fails() {
+		let mut buf = Vec::new();
+		make_db("passphrase")
+			.write(Box::new(&mut buf), b"secret data")
+			.unwrap();
+
+		// Flip a byte in the ciphertext region (after version + salt + nonce)
+		buf[8 /* version */ + 32 /* salt */ + 24 /* nonce */] ^= 0xFF;
 
 		let result = make_db("passphrase").read(Box::new(buf.as_slice()));
 		assert!(result.is_err());
