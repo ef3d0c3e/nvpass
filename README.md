@@ -2,6 +2,8 @@
 
 This plugin provides a secure vault for neovim.
 
+![Demo](./demo.gif)
+
 # Installation
 
 You must first build and install the vault program:
