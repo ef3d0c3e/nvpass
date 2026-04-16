@@ -65,7 +65,7 @@ function M.decrypt(vault_path, passphrase)
 		end)
 	end)
 
-	-- Read vault progrma response on stdout_pipe
+	-- Read vault program response on stdout_pipe
 	stdout_pipe:read_start(function(re, data)
 		if re then
 			stdout_pipe:close(); return
@@ -168,7 +168,7 @@ function M.encrypt(vault_path, plaintext, passphrase, tmp_dir)
 	local err_msg = table.concat(err_chunks)
 
 	if exit_code ~= 0 or #err_msg ~= 0 then
-		vim.uv.fs_unlink(tmp_path) -- Delette temporary
+		vim.uv.fs_unlink(tmp_path) -- Delete temporary
 		return false, "encryption failed: " .. (err_msg ~= "" and err_msg or "exit " .. tostring(exit_code))
 	end
 

@@ -27,6 +27,8 @@ use std::{
 
 pub mod db;
 
+use argon2::password_hash::rand_core::RngCore;
+use chacha20poly1305::aead::OsRng;
 use getopts::Options;
 use zeroize::Zeroizing;
 
@@ -94,6 +96,7 @@ fn main() -> std::io::Result<()> {
 		"Read password from specific FD",
 		"NUMBER",
 	);
+	opts.optopt("g", "generate", "Generate random text", "LEN");
 	opts.optflag("h", "help", "Print this help menu");
 	opts.optflag("v", "version", "Display program version");
 	let matches = opts
@@ -107,7 +110,24 @@ fn main() -> std::io::Result<()> {
 		print_version();
 		return Ok(());
 	}
-	if let Some(input) = matches.opt_str("e") {
+	if let Some(len) = matches.opt_str("g") {
+		let value = usize::from_str_radix(&len, 10).map_err(|err| io::Error::other(format!("Failed to parse `{len}' as length: {err}")))?;
+
+		if value == 0 || value > 1024 {
+			return Err(io::Error::other(format!(
+				"Generate length out of bounds, expected a value between 1 and 1024, got: {value}"
+			)));
+		}
+
+		const CHARSET: &'static [u8; 62] =
+			b"0123456789abcdefghjiklmnopqrstuvwxyzABCDEFGHJIKLMNOPQRSTUVWXYZ";
+		let mut rng = OsRng::default();
+		let output: Vec<u8> = (0..value).map(|_| {
+			let idx = rng.next_u32() as usize % CHARSET.len();
+			CHARSET[idx]
+		}).collect();
+		io::stdout().write_all(output.as_slice())?;
+	} else if let Some(input) = matches.opt_str("e") {
 		let output = matches.free.first().map_or(
 			Err(io::Error::other("Expected output file".to_string())),
 			|s| Ok(s),
