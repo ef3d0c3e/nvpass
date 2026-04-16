@@ -229,68 +229,6 @@ function M.setup(opts)
 	})
 
 	vim.api.nvim_create_user_command("Random", function()
-		function exec(length)
-			local bin = util.assert_binary()
-
-			local stdout_pipe = vim.uv.new_pipe(false)
-			local stderr_pipe = vim.uv.new_pipe(false)
-			if not stdout_pipe or not stderr_pipe then
-				return false, "failed to allocate pipes"
-			end
-
-			local out_chunks = {} -- stdout
-			local err_chunks = {} -- stderr
-			local exit_code = nil
-			local done = false
-
-			local handle, spawn_err_msg = vim.uv.spawn(bin, {
-				args = { "-g", length },
-				stdio = { nil, stdout_pipe, stderr_pipe, },
-			}, function(code, _signal)
-				exit_code = code
-				done = true
-			end)
-
-			if not handle then
-				stdout_pipe:close(); stderr_pipe:close()
-				return false, "spawn failed: " .. tostring(spawn_err_msg)
-			end
-
-			-- Read vault program response on stdout_pipe
-			stdout_pipe:read_start(function(re, data)
-				if re then
-					stdout_pipe:close(); return
-				end
-				if data then out_chunks[#out_chunks + 1] = data else stdout_pipe:close() end
-			end)
-
-			-- Read vault program stderr
-			stderr_pipe:read_start(function(re, data)
-				if re then
-					stderr_pipe:close(); return
-				end
-				if data then err_chunks[#err_chunks + 1] = data else stderr_pipe:close() end
-			end)
-
-			-- Wait for completion. TODO: This should be handled more carefully, e.g SIGKILL after a while, while making sure we don't create zombies
-			vim.wait(10000, function() return done end, 5)
-			-- Release libuv res
-			handle:close()
-
-			local generated = table.concat(out_chunks)
-			local err_msg = table.concat(err_chunks)
-
-			-- Wipe stdout chunks and collect garbage
-			for i = 1, #out_chunks do out_chunks[i] = nil end
-			collectgarbage("collect")
-
-			if exit_code ~= 0 or #err_msg ~= 0 then
-				return false, (err_msg ~= "" and err_msg or "exit " .. tostring(exit_code))
-			end
-
-			return true, generated
-		end
-
 		vim.ui.input({ prompt = "Generated text length: "}, function(input)
 			local length = tonumber(input)
 			if not length then
@@ -298,7 +236,7 @@ function M.setup(opts)
 				return
 			end
 
-			local ok, out = exec(length)
+			local ok, out = vault.random(length)
 			if not ok then
 				util.err("Generation failed: " .. out)
 				return
