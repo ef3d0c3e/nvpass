@@ -27,9 +27,9 @@ use std::{
 
 pub mod db;
 
-use argon2::password_hash::rand_core::RngCore;
-use chacha20poly1305::aead::OsRng;
 use getopts::Options;
+use rand::rngs::ThreadRng;
+use rand_distr::{Distribution, Uniform};
 use zeroize::Zeroizing;
 
 use crate::db::Database;
@@ -111,7 +111,7 @@ fn main() -> std::io::Result<()> {
 		return Ok(());
 	}
 	if let Some(len) = matches.opt_str("g") {
-		let value = usize::from_str_radix(&len, 10).map_err(|err| io::Error::other(format!("Failed to parse `{len}' as length: {err}")))?;
+		let value = len.parse::<usize>().map_err(|err| io::Error::other(format!("Failed to parse `{len}' as length: {err}")))?;
 
 		if value == 0 || value > 1024 {
 			return Err(io::Error::other(format!(
@@ -119,23 +119,25 @@ fn main() -> std::io::Result<()> {
 			)));
 		}
 
-		const CHARSET: &'static [u8; 62] =
+		const CHARSET: &[u8; 62] =
 			b"0123456789abcdefghjiklmnopqrstuvwxyzABCDEFGHJIKLMNOPQRSTUVWXYZ";
-		let mut rng = OsRng::default();
+		let mut rng = ThreadRng::default();
+		let distr = Uniform::new(0, CHARSET.len()).map_err(
+			|err| io::Error::other(format!("Failed to build uniform distribution: {err}"))
+		)?;
 		let output: Vec<u8> = (0..value).map(|_| {
-			let idx = rng.next_u32() as usize % CHARSET.len();
+			let idx = distr.sample(&mut rng);
 			CHARSET[idx]
 		}).collect();
 		io::stdout().write_all(output.as_slice())?;
 	} else if let Some(input) = matches.opt_str("e") {
-		let output = matches.free.first().map_or(
-			Err(io::Error::other("Expected output file".to_string())),
-			|s| Ok(s),
+		let output = matches.free.first().ok_or(
+			io::Error::other("Expected output file".to_string()),
 		)?;
 
 		let pass_source = match matches.opt_str("passphrase-fd") {
 			Some(opt) => {
-				let fd = i32::from_str_radix(&opt, 10).map_err(|err| {
+				let fd = opt.parse::<i32>().map_err(|err| {
 					io::Error::other(format!("Failed to parse passphrase-fd: {err}"))
 				})?;
 				PassphraseSource::Fd(fd)
@@ -160,20 +162,19 @@ fn main() -> std::io::Result<()> {
 		let dest_out: Box<dyn Write> = if output == "-" {
 			Box::new(io::stdout().lock())
 		} else {
-			Box::new(std::fs::File::create(&output)?)
+			Box::new(std::fs::File::create(output)?)
 		};
 		db.write(dest_out, &data)?;
 
 		return Ok(());
 	} else if let Some(input) = matches.opt_str("d") {
-		let output = matches.free.first().map_or(
-			Err(io::Error::other("Expected output file".to_string())),
-			|s| Ok(s),
+		let output = matches.free.first().ok_or(
+			io::Error::other("Expected output file".to_string()),
 		)?;
 
 		let pass_source = match matches.opt_str("passphrase-fd") {
 			Some(opt) => {
-				let fd = i32::from_str_radix(&opt, 10).map_err(|err| {
+				let fd = opt.parse::<i32>().map_err(|err| {
 					io::Error::other(format!("Failed to parse passphrase-fd: {err}"))
 				})?;
 				PassphraseSource::Fd(fd)
@@ -198,7 +199,7 @@ fn main() -> std::io::Result<()> {
 		let mut dest_out: Box<dyn Write> = if output == "-" {
 			Box::new(io::stdout().lock())
 		} else {
-			Box::new(std::fs::File::create(&output)?)
+			Box::new(std::fs::File::create(output)?)
 		};
 		dest_out.write_all(&data)?;
 

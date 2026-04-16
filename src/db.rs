@@ -67,7 +67,7 @@ pub mod v1 {
 	impl Db {
 		pub fn new(passphrase: Zeroizing<String>) -> Self {
 			Self {
-				passphrase: passphrase,
+				passphrase,
 			}
 		}
 
@@ -75,7 +75,7 @@ pub mod v1 {
 		pub fn derive_key(&self, salt: &[u8; 32]) -> io::Result<Zeroizing<[u8; 32]>> {
 			// Assert we are using an appropriate salt length
 			const {
-				const ENCODED_LEN: usize = (32 * 4 as usize).div_ceil(3); // = 43
+				const ENCODED_LEN: usize = (32 * 4_usize).div_ceil(3); // = 43
 				assert!(ENCODED_LEN >= Salt::RECOMMENDED_LENGTH);
 				assert!(ENCODED_LEN <= Salt::MAX_LENGTH);
 			}
@@ -191,7 +191,7 @@ pub mod v1 {
 			let key = self.derive_key(&salt)?;
 
 			// Build aad
-			let aad = self.aad(nonce.into());
+			let aad = self.aad(nonce);
 
 			// Build cipher
 			let cipher = chacha20poly1305::XChaCha20Poly1305::new_from_slice(key.as_slice())
@@ -214,7 +214,7 @@ pub mod v1 {
 						.as_slice(),
 				},
 			)
-			.map(|vec| Zeroizing::new(vec))
+			.map(Zeroizing::new)
 			.map_err(|err| {
 				io::Error::other(format!("Failed to decrypt using chacha20-poly1305: {err}"))
 			})
