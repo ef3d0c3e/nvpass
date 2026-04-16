@@ -17,6 +17,7 @@ Then setup the plugin:
 {
     "ef3d0c3e/nvpass",
     opts = {
+        -- Must be an absolute path
         vault_bin = vim.fn.expand("~/path/to/nvpass")
     }
 },
