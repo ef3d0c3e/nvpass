@@ -30,6 +30,10 @@ When you open a file, the plugin will prompt you for a password to decrypt the f
 Once decrypted, you will see the content of the file in a virtual buffer, saving this buffer will re-encrypt and save the vault file.
 Note that in order to prevent accidental data losses, the vault file (encrypted) is first written to a temporary directory, before overwriting the original file on disk.
 
+**Random**
+You can use the `:Random` command to generate a random password within neovim. The plugin will prompt you for length and will generate a random alphanumeric password.
+To give you an idea, the generated password has around 5.95 bits of entropy by character, so a password of length 20 has around 120 bits of entropy, which should be good for most purposes.
+
 # Security
 
 Because of how neovim works, it's not really possible to make a secure password manager.
@@ -42,6 +46,15 @@ Secrets communicated to the vault executable are sent through a pipe, to prevent
 
 Therefore, I strongly advise against using this plugin for any sensitive data, however, I try to make sure the vault executable properly secures secrets.
 The current version uses chacha20-poly1305 for encryption/authentication, with argon2 for key derivation (32-byte random salt).
+
+## Vault format
+
+This is a detailed description of how secrets are stored in the vault file:
+```
+[8 byte version number (LE)][32 byte salt for argon2][24 byte nonce for chacha20-poly1305][ciphertext]
+```
+
+The chacha20-poly1305 AAD is built using the following: `{ version number, nonce }`. This prevents nonce and version tampering.
 
 # License
 
